@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <smmintrin.h>
+#include <limits>
 
 uint32_t hashUint32(uint32_t input)
 {
@@ -109,7 +110,7 @@ void basisVector(const vec3f &nIn, const vec3f &vIn, vec3f *sOut, vec3f *tOut)
   // assign constant variables
   static __m128 half = _mm_set1_ps(0.5f);
   static __m128 three = _mm_set1_ps(3.f);
-  static __m128 zero = _mm_set1_ps(0.f);
+  static __m128 zero = _mm_set1_ps(std::numeric_limits<float>::epsilon());
 
   // load input into aligned memory
   __m128 n = _mm_setr_ps(nIn.x, nIn.y, nIn.z, 0.f);
