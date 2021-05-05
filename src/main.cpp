@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <math.h>
 #include <smmintrin.h>
-#include <limits>
 
 uint32_t hashUint32(uint32_t input)
 {
@@ -110,7 +109,7 @@ void basisVector(const vec3f &nIn, const vec3f &vIn, vec3f *sOut, vec3f *tOut)
   // assign constant variables
   static __m128 half = _mm_set1_ps(0.5f);
   static __m128 three = _mm_set1_ps(3.f);
-  static __m128 zero = _mm_set1_ps(std::numeric_limits<float>::epsilon());
+  static __m128 epsilon = _mm_set1_ps(1e-9f);
 
   // load input into aligned memory
   __m128 n = _mm_setr_ps(nIn.x, nIn.y, nIn.z, 0.f);
@@ -124,14 +123,19 @@ void basisVector(const vec3f &nIn, const vec3f &vIn, vec3f *sOut, vec3f *tOut)
   __m128 uZXY = _mm_sub_ps(_mm_mul_ps(n, vYZX), _mm_mul_ps(nYZX, v));
   __m128 u = _mm_shuffle_ps(uZXY, uZXY, mask);
 
-  // normalise result using Newton's method and store as t
+  // normalise result using Newton's method
   __m128 lsqr = _mm_dp_ps(u, u, 0xFF);
-  __m128 sqrt = _mm_rsqrt_ps(lsqr);
-  __m128 mult = _mm_mul_ps(_mm_mul_ps(lsqr, sqrt), sqrt);
-  __m128 t = _mm_mul_ps(u, _mm_mul_ps(_mm_mul_ps(half, sqrt), _mm_sub_ps(three, mult)));
+  __m128 rsqrt = _mm_rsqrt_ps(lsqr);
 
-  // prevent nan by checking if lsqr is greater than zero
-  __m128 cmp = _mm_cmpgt_ps(lsqr, zero);
+  // https://en.wikipedia.org/wiki/Fast_inverse_square_root#Newton's_method
+  rsqrt = _mm_mul_ps(_mm_mul_ps(half, rsqrt),
+                     _mm_sub_ps(three, _mm_mul_ps(lsqr, _mm_mul_ps(rsqrt, rsqrt))));
+
+  // store as t vector
+  __m128 t = _mm_mul_ps(u, rsqrt);
+
+  // prevent nan by checking if lsqr is greater than epsilon
+  __m128 cmp = _mm_cmpgt_ps(lsqr, epsilon);
   t = _mm_or_ps(_mm_and_ps(cmp, t), _mm_andnot_ps(cmp, u));
 
   // shuffle t for cross product
